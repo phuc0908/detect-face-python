@@ -1,174 +1,171 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, \
-    QTableWidgetItem, QHeaderView, QMenu, QAction
-from PyQt5.QtCore import Qt, QPoint
 import sys
-import os
+import threading
 import subprocess
+import mysql.connector
+from addUser import AddUserWindow
+from editUser import EditUserWindow
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel, \
+    QTableWidget, QTableWidgetItem, QHeaderView, QDateEdit, QComboBox, QSpacerItem, QSizePolicy, QMenu, QMessageBox
+from PyQt5.QtCore import Qt, QPoint
 
+
+# Cấu hình kết nối đến MySQL
+def get_db_connection():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="detect_face_app"
+    )
+
+
+# MAIN -------------------------------------------------------------------MAIN---------------------------------->
 
 class HomeWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # Thiết lập kích thước và tiêu đề cho cửa sổ
-        self.setWindowTitle("User Management")
-        self.setFixedSize(1400, 900)
-
-        # Căn giữa cửa sổ
-        self.center_window()
+        self.setWindowTitle("Trang Chủ")
+        self.setFixedSize(1400, 800)
 
         # Tạo layout chính
-        main_layout = QVBoxLayout()
+        layout = QVBoxLayout()
 
-        # Tạo layout chứa nút "Thêm User"
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()  # Đẩy nút sang bên phải
-        self.add_button = QPushButton("Thêm User")
-        button_layout.addWidget(self.add_button)
+        add_layout = QHBoxLayout()
 
-        # Bảng hiển thị danh sách người dùng
+        # Tạo nút "Refresh"
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.load_users)  # Kết nối nút với hàm load_users
+        add_layout.addWidget(self.refresh_button)
+
+        # Spacer để đẩy nút "Thêm Người Dùng" sang phải
+        spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+        add_layout.addItem(spacer)
+
+        # Tạo nút "Thêm Người Dùng"
+        self.add_button = QPushButton("Thêm Người Dùng")
+        add_layout.addWidget(self.add_button)
+
+        # Thêm layout nút vào layout chính
+        layout.addLayout(add_layout)
+
+        # Bảng hiển thị người dùng
         self.user_table = QTableWidget()
-        self.user_table.setColumnCount(6)  # Số cột: ID, Tên, CCCD, Ảnh, Hành động
-        self.user_table.setHorizontalHeaderLabels(["ID", "Tên", "CCCD", "Ảnh","Trạng thái", "Hành động"])
+        self.user_table.setColumnCount(7)
+        self.user_table.setHorizontalHeaderLabels(["ID", "Tên", "CCCD", "Email", "Phone", "Avatar", "Trạng thái"])
+        self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.user_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.user_table.customContextMenuRequested.connect(self.open_context_menu)
 
-        # Thiết lập để bảng tự động căn chỉnh cột theo kích thước
+        # Thiết lập tự động căn chỉnh cột
         header = self.user_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
 
-        # Thiết lập chọn toàn bộ hàng khi click vào một ô
-        self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
+        # Thêm bảng vào layout
+        layout.addWidget(self.user_table)
 
-        # Thêm layout vào layout chính
-        main_layout.addLayout(button_layout)
-        main_layout.addWidget(self.user_table)
+        # Kết nối sự kiện khi nhấn nút "Thêm Người Dùng"
+        self.add_button.clicked.connect(self.open_add_user_window)
 
-        # Thiết lập layout cho cửa sổ chính
+        # Tạo widget chính và thiết lập layout
         container = QWidget()
-        container.setLayout(main_layout)
+        container.setLayout(layout)
         self.setCentralWidget(container)
 
-        # Kết nối sự kiện cho nút thêm user
-        self.add_button.clicked.connect(self.add_user)
+        # Load dữ liệu người dùng
+        self.load_users()
 
-        # Thêm dữ liệu mẫu để kiểm tra
-        sample_users = [
-            {"id": 1, "name": "Nguyen Van A", "cccd": "012345678","status":"Updated", "image": "path/to/image1.jpg"},
-            {"id": 2, "name": "Le Thi B", "cccd": "987654321","status":"None", "image": "path/to/image2.jpg"},
-        ]
-        self.load_users(sample_users)
+    def load_users(self):
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, cccd, email, phone, avatar, status FROM users")  # Lấy tất cả người dùng từ DB
+            users = cursor.fetchall()
+            conn.close()
 
-        # Kết nối sự kiện menu chuột phải cho bảng
-        self.user_table.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.user_table.customContextMenuRequested.connect(self.show_context_menu)
+            # Đặt lại số hàng trước khi nạp dữ liệu
+            self.user_table.setRowCount(0)  # Xóa tất cả các hàng hiện tại
+            self.user_table.setRowCount(len(users))  # Đặt lại số hàng theo dữ liệu mới
 
-    def center_window(self):
-        screen = QApplication.desktop().screenGeometry()
-        window_size = self.geometry()
-        x = (screen.width() - window_size.width()) // 2
-        y = (screen.height() - window_size.height()) // 2
-        self.move(x, y)
+            # Nạp dữ liệu vào bảng
+            for row, user in enumerate(users):
+                for col, value in enumerate(user):
+                    self.user_table.setItem(row, col, QTableWidgetItem(str(value)))
 
-    def load_users(self, users):
-        """
-        Hàm để nạp danh sách người dùng vào bảng.
-        :param users: Danh sách người dùng với mỗi user là một dict chứa ID, Tên, CCCD, và Ảnh.
-        """
-        self.user_table.setRowCount(len(users))  # Thiết lập số hàng theo số lượng người dùng
+            print("Dữ liệu người dùng đã được nạp thành công.")
 
-        for row, user in enumerate(users):
-            # Thêm các mục vào bảng và đặt thành không thể chỉnh sửa
-            self.user_table.setItem(row, 0, QTableWidgetItem(str(user['id'])))
-            self.user_table.setItem(row, 1, QTableWidgetItem(user['name']))
-            self.user_table.setItem(row, 2, QTableWidgetItem(user['cccd']))
-            self.user_table.setItem(row, 3, QTableWidgetItem(user['status']))
-            self.user_table.setItem(row, 4, QTableWidgetItem(user['image']))
+        except mysql.connector.Error as e:
+            print(f"Lỗi kết nối DB: {e}")
 
-            for col in range(4):
-                self.user_table.item(row, col).setFlags(
-                    Qt.ItemIsSelectable | Qt.ItemIsEnabled)  # Chỉ cho phép sao chép, không chỉnh sửa
+    def open_context_menu(self, position: QPoint):
+        index = self.user_table.indexAt(position)
+        row = index.row()
+        col = index.column()
 
-            # Tạo nút "Sửa" và "Xóa" cho cột hành động
-            edit_button = QPushButton("Sửa")
-            delete_button = QPushButton("Xóa")
+        if row < 0:
+            return
 
-            # Thiết lập kích thước font chữ nhỏ hơn cho nút
-            edit_button.setStyleSheet("font-size: 12px;")
-            delete_button.setStyleSheet("font-size: 12px;")
+        context_menu = QMenu(self)
+        add_face_action = context_menu.addAction("Thêm khuôn mặt")
+        edit_user_action = context_menu.addAction("Sửa User")
+        delete_user_action = context_menu.addAction("Xóa User")
 
-            # Kết nối sự kiện nút
-            edit_button.clicked.connect(lambda _, r=row: self.edit_user(r))
-            delete_button.clicked.connect(lambda _, r=row: self.delete_user(r))
+        add_face_action.triggered.connect(lambda: self.add_face(row))
+        edit_user_action.triggered.connect(lambda: self.edit_user(row))
+        delete_user_action.triggered.connect(lambda: self.delete_user(row))
 
-            # Tạo layout chứa nút trong một widget
-            action_widget = QWidget()
-            action_layout = QHBoxLayout(action_widget)
-            action_layout.addWidget(edit_button)
-            action_layout.addWidget(delete_button)
-            action_layout.setAlignment(Qt.AlignCenter)
-            action_layout.setContentsMargins(0, 0, 0, 0)  # Loại bỏ khoảng trống xung quanh
-            self.user_table.setCellWidget(row, 5, action_widget)
+        context_menu.exec_(self.user_table.viewport().mapToGlobal(position))
 
-    def show_context_menu(self, position: QPoint):
-        # Lấy hàng hiện tại theo vị trí của chuột
-        selected_row = self.user_table.indexAt(position).row()
-
-        # Kiểm tra nếu hàng có tồn tại
-        if selected_row != -1:
-            # Tạo menu chuột phải
-            context_menu = QMenu(self)
-
-            # Thêm các tùy chọn vào menu ngữ cảnh
-            add_face_action = QAction("Thêm khuôn mặt", self)
-            add_face_action.triggered.connect(lambda: self.add_face(selected_row))
-            context_menu.addAction(add_face_action)
-
-            list_face_action = QAction("Xem khuôn mặt", self)
-            list_face_action.triggered.connect(lambda: self.list_face(selected_row))
-            context_menu.addAction(list_face_action)
-
-            edit_action = QAction("Sửa", self)
-            edit_action.triggered.connect(lambda: self.edit_user(selected_row))
-            context_menu.addAction(edit_action)
-
-            delete_action = QAction("Xóa", self)
-            delete_action.triggered.connect(lambda: self.delete_user(selected_row))
-            context_menu.addAction(delete_action)
-
-            # Hiển thị menu tại vị trí của chuột
-            context_menu.exec_(self.user_table.viewport().mapToGlobal(position))
-
-    def list_face(self, selected_row):
-        pass
-
-    def add_user(self):
-        # Xử lý thêm user
-        print("Thêm User")
-
-    def edit_user(self, row):
-        # Xử lý sửa user
-        user_id = self.user_table.item(row, 0).text()
-        print(f"Sửa User ID: {user_id}")
-
-    def delete_user(self, row):
-        # Xử lý xóa user
-        user_id = self.user_table.item(row, 0).text()
-        print(f"Xóa User ID: {user_id}")
-        self.user_table.removeRow(row)
+    def dummy_action(self, action_name, row):
+        print(f"Action '{action_name}' selected for row {row}")
 
     def add_face(self, row):
-        # Lấy ID của user từ bảng
-        user_id = self.user_table.item(row, 0).text()
-        print(1)
+        user_id = self.user_table.item(row, 0).text()  # Get user ID from the selected row
+        print(f"Thêm khuôn mặt cho user ID: {user_id}")
 
-        self.run_face_detection(user_id)
+        # Run the face detection script with the user ID as an argument
+        subprocess.Popen(["python", "../facedetect.py", user_id])
 
-    def run_face_detection(self, user_id):
-        try:
-            script_path = r'/main/facedetect.py'
+    def open_add_user_window(self):
+        self.add_user_window = AddUserWindow()  # Tạo cửa sổ thêm người dùng
+        self.add_user_window.user_added.connect(self.load_users)  # Kết nối tín hiệu với hàm load_users
+        self.add_user_window.show()  # Hiển thị cửa sổ thêm người dùng
 
-            subprocess.run([sys.executable, script_path, user_id], check=True)
-        except Exception as e:
-            print(f"Error: {e}")
+    def edit_user(self, row):
+        user_id = self.user_table.item(row, 0).text()  # Get user ID from the selected row
+        print(f"Sửa user ID: {user_id}")
+
+        # Open EditUserWindow with the selected user's data
+        self.edit_user_window = EditUserWindow(int(user_id))
+        self.edit_user_window.user_updated.connect(self.load_users)
+        self.edit_user_window.show()  # Display the EditUserWindow
+
+    def delete_user(self, row):
+        user_id = self.user_table.item(row, 0).text()  # Lấy ID của người dùng từ hàng được chọn
+
+        # Xác nhận người dùng có chắc chắn muốn xóa không
+        reply = QMessageBox.question(self, "Xóa Người Dùng",
+                                     f"Bạn có chắc chắn muốn xóa người dùng với ID {user_id} không?",
+                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                # Xóa người dùng khỏi cơ sở dữ liệu
+                cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                print(f"Đã xóa người dùng với ID: {user_id}")
+
+                # Cập nhật bảng hiển thị sau khi xóa
+                self.load_users()
+
+            except mysql.connector.Error as e:
+                print(f"Lỗi kết nối DB: {e}")
+
 
 
 # Chạy ứng dụng

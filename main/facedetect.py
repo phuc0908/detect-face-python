@@ -2,22 +2,27 @@ import sys
 import cv2
 import mysql.connector
 import os
-from main import config
 
-# Lấy ID người dùng từ đối số dòng lệnh (user_id)
-# if len(sys.argv) != 2:
-#     print("Lỗi: Bạn phải cung cấp user_id.")
-#     sys.exit(1)
+if len(sys.argv) != 2:
+    print("Lỗi: Bạn phải cung cấp user_id.")
+    sys.exit(1)
 
-user_id = 11 # sys.argv[1]
+user_id =  int(sys.argv[1])
+
+DB_HOST = "localhost"
+DB_USER = "root"
+DB_PASSWORD = ""
+DB_NAME = "detect_face_app"
 
 # Kết nối với MySQL
 db = mysql.connector.connect(
-    host=config.DB_HOST,
-    user=config.DB_USER,
-    password=config.DB_PASSWORD,
-    database=config.DB_NAME
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB_NAME
 )
+
+face_detector = cv2.CascadeClassifier(os.path.join(os.getcwd(), '../haarcascade.xml'))
 
 # Tạo con trỏ để thực hiện truy vấn
 cursor = db.cursor()
@@ -26,7 +31,7 @@ cursor = db.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS face_data (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    face_id VARCHAR(50),
+    user_id VARCHAR(50),
     image_path VARCHAR(255)
 )
 """)
@@ -39,7 +44,7 @@ cam.set(4, 480)  # Đặt chiều cao
 print("Khởi động camera...")
 
 # Tạo thư mục 'dataset' nếu chưa tồn tại
-dataset_dir = os.path.abspath('../dataset')
+dataset_dir = os.path.abspath('../../dataset')
 if not os.path.exists(dataset_dir):
     os.makedirs(dataset_dir)
 
@@ -59,7 +64,7 @@ while True:
     img = cv2.flip(img, 1)  # Lật ảnh theo chiều dọc
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    faces = config.face_detector.detectMultiScale(gray, 1.3, 5)
+    faces = face_detector.detectMultiScale(gray, 1.3, 5)
 
     for (x, y, w, h) in faces:
         cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
@@ -72,7 +77,7 @@ while True:
         cv2.imwrite(image_path, gray[y:y+h, x:x+w])
 
         # Lưu đường dẫn ảnh vào MySQL
-        cursor.execute("INSERT INTO face_data (face_id, image_path) VALUES (%s, %s)", (user_id, image_path))
+        cursor.execute("INSERT INTO face_data (user_id, image_path) VALUES (%s, %s)", (user_id, image_path))
         db.commit()
 
     # Hiển thị ảnh
@@ -80,7 +85,7 @@ while True:
 
     # Điều kiện thoát
     k = cv2.waitKey(100) & 0xff
-    if k == 27 or count >= 20:
+    if k == 27 or count >= 50:
         print("Đã chụp đủ ảnh hoặc người dùng đã nhấn ESC")
         break
 
