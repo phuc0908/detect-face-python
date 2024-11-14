@@ -1,89 +1,66 @@
 import sys
-import threading
-import mysql.connector
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, \
+    QLabel
 
-# Cấu hình kết nối đến MySQL
-def get_db_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",
-        database="detect_face_app"
-    )
+# Giả sử bạn đã có HomeWindow từ file home.py
+from home import HomeWindow
 
-class AddUserWindow(QWidget):
+
+# Tạo một cửa sổ mới
+class MainWindow1(QWidget):
     def __init__(self):
         super().__init__()
-
-        self.setWindowTitle("Thêm Người Dùng")
-        self.setFixedSize(300, 200)
-
-        # Tạo layout chính
         layout = QVBoxLayout()
-
-        self.name_label = QLabel("Nhập tên người dùng:")
-        self.name_input = QLineEdit()
-
-        self.submit_button = QPushButton("Thêm")
-        layout.addWidget(self.name_label)
-        layout.addWidget(self.name_input)
-        layout.addWidget(self.submit_button)
-
-        # Kết nối sự kiện cho nút "Thêm"
-        self.submit_button.clicked.connect(self.add_user)
-
+        layout.addWidget(QLabel("Đây là MainWindow 1"))
         self.setLayout(layout)
 
-    def add_user(self):
-        name = self.name_input.text()
-        if name:
-            # Gọi hàm thêm người dùng vào DB trong luồng
-            threading.Thread(target=self.add_user_to_db, args=(name,)).start()
-        self.close()
 
-    def add_user_to_db(self, name):
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO users (name) VALUES (%s)", (name,))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            print(f"Đã thêm người dùng: {name}")
-        except mysql.connector.Error as e:
-            print(f"Lỗi kết nối DB: {e}")
-
-class HomeWindow(QMainWindow):
+# Tạo sidebar cho ứng dụng
+class SidebarApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("Ứng dụng với Sidebar")
 
-        self.setWindowTitle("Trang Chủ")
-        self.setFixedSize(400, 300)
+        # Khởi tạo cửa sổ HomeWindow
+        # self.home = HomeWindow()
 
-        # Tạo layout chính
-        layout = QVBoxLayout()
+        # Tạo QStackedWidget để chứa các cửa sổ
+        self.stacked_widget = QStackedWidget()
+        self.window1 = MainWindow1()
+        self.stacked_widget.addWidget(self.window1)
+        # self.stacked_widget.addWidget(self.home)
 
-        self.add_button = QPushButton("Thêm Người Dùng")
-        layout.addWidget(self.add_button)
+        # Tạo sidebar với các nút
+        sidebar_layout = QVBoxLayout()
+        button1 = QPushButton("Chuyển sang MainWindow 1")
+        button2 = QPushButton("Chuyển sang Home")
 
-        # Kết nối sự kiện khi nhấn nút "Thêm Người Dùng"
-        self.add_button.clicked.connect(self.open_add_user_window)
+        # Kết nối sự kiện chuyển đổi giữa các cửa sổ
+        button1.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.window1))
+        # button2.clicked.connect(lambda: self.stacked_widget.setCurrentWidget(self.home))
 
-        # Tạo widget chính và thiết lập layout
+        sidebar_layout.addWidget(button1)
+        sidebar_layout.addWidget(button2)
+        sidebar_layout.addStretch()  # Đẩy các nút lên phía trên
+
+        # Sidebar: tạo một widget cố định và đặt nó vào một layout
+        sidebar_widget = QWidget()
+        sidebar_widget.setLayout(sidebar_layout)
+
+        # Đặt sidebar và stacked_widget vào layout chính
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(sidebar_widget, 1)  # Sidebar có tỷ lệ chiếm 1 phần không gian
+        main_layout.addWidget(self.stacked_widget, 5)  # Nội dung chính chiếm 5 phần không gian
+
+        # Đặt layout chính vào một widget và thiết lập làm central widget
         container = QWidget()
-        container.setLayout(layout)
+        container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-    def open_add_user_window(self):
-        self.add_user_window = AddUserWindow()  # Tạo cửa sổ thêm người dùng
-        self.add_user_window.show()  # Hiển thị cửa sổ thêm người dùng
 
-
-# Chạy ứng dụng
+# Khởi chạy ứng dụng
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = HomeWindow()
+    window = SidebarApp()
     window.show()
     sys.exit(app.exec_())

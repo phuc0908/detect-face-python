@@ -22,7 +22,7 @@ class EditUserWindow(QWidget):
         super().__init__()
         self.user_id = user_id
         self.setWindowTitle("Sửa Thông Tin Người Dùng")
-        self.setFixedSize(400, 300)
+        self.setFixedSize(350, 350)
 
         # Layout setup
         layout = QVBoxLayout()
@@ -32,6 +32,7 @@ class EditUserWindow(QWidget):
         self.cccd_edit = QLineEdit()
         self.email_edit = QLineEdit()
         self.phone_edit = QLineEdit()
+        self.avatar_edit = QLineEdit()
 
         # Labels and Inputs
         layout.addWidget(QLabel("Tên"))
@@ -42,14 +43,27 @@ class EditUserWindow(QWidget):
         layout.addWidget(self.email_edit)
         layout.addWidget(QLabel("Phone"))
         layout.addWidget(self.phone_edit)
+        layout.addWidget(QLabel("Avatar"))
+        layout.addWidget(self.avatar_edit)
+
+        button_layout = QHBoxLayout()
+
+        self.spacer_item = QSpacerItem(20, 10, QSizePolicy.Minimum, QSizePolicy.Expanding)
+
+        self.save_button = QPushButton("Lưu")
+        self.cancel_button = QPushButton("Hủy Bỏ")
+
+        button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.cancel_button)
+
+        layout.addLayout(button_layout)
 
         # Load the existing data for the user
         self.load_user_data()
 
         # Save button
-        save_button = QPushButton("Lưu")
-        save_button.clicked.connect(self.save_user_data)
-        layout.addWidget(save_button)
+
+        self.save_button.clicked.connect(self.save_user_data)
 
         self.setLayout(layout)
 
@@ -58,7 +72,7 @@ class EditUserWindow(QWidget):
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT name, cccd, email, phone FROM users WHERE id = %s", (self.user_id,))
+            cursor.execute("SELECT name, cccd, email, phone, avatar FROM users WHERE id = %s", (self.user_id,))
             user = cursor.fetchone()
             conn.close()
 
@@ -67,6 +81,7 @@ class EditUserWindow(QWidget):
                 self.cccd_edit.setText(user[1])
                 self.email_edit.setText(user[2])
                 self.phone_edit.setText(user[3])
+                self.avatar_edit.setText(user[4])
         except mysql.connector.Error as e:
             print(f"Lỗi khi tải dữ liệu người dùng: {e}")
 
@@ -76,14 +91,15 @@ class EditUserWindow(QWidget):
         cccd = self.cccd_edit.text()
         email = self.email_edit.text()
         phone = self.phone_edit.text()
+        avatar = self.avatar_edit.text()
 
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE users SET name = %s, cccd = %s, email = %s, phone = %s
+                UPDATE users SET name = %s, cccd = %s, email = %s, phone = %s, avatar = %s
                 WHERE id = %s
-            """, (name, cccd, email, phone, self.user_id))
+            """, (name, cccd, email, phone, avatar, self.user_id))
             conn.commit()
             conn.close()
             print("Dữ liệu người dùng đã được cập nhật.")

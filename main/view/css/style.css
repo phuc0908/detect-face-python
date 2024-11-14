@@ -1,0 +1,29 @@
+/* style.css */
+QLineEdit {
+    border: 1px solid #3498db;
+    border-radius: 5px;
+    padding: 5px;
+}
+QTableWidget{
+    /*background-color: #27ae60;*/
+}
+QTableWidget::item:selected{
+    background-color: lightblue;
+    color: black;
+}
+
+QPushButton {
+    border: 2px solid #2ecc71;
+    border-radius: 5px;
+    padding: 5px;
+    background-color: #27ae60;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: #2ecc71;
+}
+
+QPushButton:pressed {
+    background-color: #1abc9c;
+}
