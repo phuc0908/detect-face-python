@@ -3,6 +3,7 @@ import mysql.connector
 from main import config
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
+from datetime import datetime
 
 # Kết nối với MySQL
 db = mysql.connector.connect(
@@ -21,7 +22,6 @@ face_names = {user_id: name for user_id, name in cursor.fetchall()}
 
 # Đóng con trỏ và kết nối
 cursor.close()
-db.close()
 
 # Khởi tạo bộ nhận diện
 recognizer = config.recognizer
@@ -41,6 +41,9 @@ minH = 0.1 * cam.get(4)
 font_path = "path/to/arial.ttf"  # Đường dẫn tới file font Unicode, ví dụ "arial.ttf"
 font_pil = ImageFont.truetype(font_path, 20)
 
+# Lưu ngày nhận diện của mỗi người (theo user_id)
+recognized_today = {}
+
 while True:
     ret, img = cam.read()
     img = cv2.flip(img, 1)
@@ -57,6 +60,35 @@ while True:
             # Lấy tên từ dictionary face_names
             name = face_names.get(id, "Unknown")
             confidence_text = "  {0}%".format(round(100 - confidence))
+
+            if name != "Unknown":
+                # Kiểm tra xem người này đã được nhận diện trong ngày hôm nay chưa
+                today_date = datetime.now().strftime('%Y-%m-%d')
+
+                # Truy vấn để kiểm tra xem người dùng đã có chấm công hôm nay chưa
+                cursor = db.cursor()
+                query = """
+                    SELECT COUNT(*) FROM schedule 
+                    WHERE user_id = %s AND DATE(start_time) = %s
+                """
+                cursor.execute(query, (id, today_date))
+                count = cursor.fetchone()[0]
+
+                if count == 0:  # Chưa có chấm công trong ngày
+                    try:
+                        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        insert_query = """
+                            INSERT INTO schedule (user_id, start_time)
+                            VALUES (%s, %s)
+                        """
+                        cursor.execute(insert_query, (id, current_time))
+                        db.commit()
+                        cursor.close()
+                    except mysql.connector.Error as e:
+                        print(f"Lỗi khi cập nhật vào bảng schedule: {e}")
+                else:
+                    print(f"User {name} đã chấm công trong ngày hôm nay.")
+
         else:
             name = "unknown"
             confidence_text = "  {0}%".format(round(100 - confidence))
@@ -82,3 +114,4 @@ while True:
 # Đóng kết nối và giải phóng tài nguyên
 cam.release()
 cv2.destroyAllWindows()
+db.close()
