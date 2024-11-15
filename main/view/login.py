@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QLineEdit, QPushB
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QCursor
 import sys
-from home import HomeWindow  # Import HomeWindow từ file home.py (nơi chứa mã HomeWindow)
+from home import MainWindow
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -69,13 +69,13 @@ class LoginWindow(QMainWindow):
         # Kiểm tra thông tin đăng nhập (tạm thời là username "admin" và password "password")
         if username == "admin" and password == "admin":
             QMessageBox.information(self, "Login Success", "Welcome, Admin!")
-            self.open_home_window()
+            self.open_main_window()
         else:
             QMessageBox.warning(self, "Login Failed", "Invalid username or password.")
 
-    def open_home_window(self):
-        self.home_window = HomeWindow()  # Khởi tạo HomeWindow
-        self.home_window.show()          # Hiển thị HomeWindow
+    def open_main_window(self):
+        self.main_window = MainWindow()  # Khởi tạo HomeWindow
+        self.main_window.show()          # Hiển thị HomeWindow
         self.close()                     # Đóng LoginWindow sau khi đăng nhập thành công
 
 # Chạy ứng dụng
