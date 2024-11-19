@@ -1,9 +1,10 @@
 import numpy as np
 from PIL import Image
 import os
-from main import config
+import cv2
 
-recognizer = config.recognizer
+face_detector = cv2.CascadeClassifier(os.path.join(os.getcwd(), '../haarcascade.xml'))
+recognizer = cv2.face.LBPHFaceRecognizer_create()
 
 def getImages(dataset_path):
     faceSamples = []
@@ -28,7 +29,7 @@ def getImages(dataset_path):
                     img_numpy = np.array(PIL_img, 'uint8')
 
                     # Phát hiện khuôn mặt
-                    faces = config.face_detector.detectMultiScale(img_numpy)
+                    faces = face_detector.detectMultiScale(img_numpy)
                     if len(faces) == 0:
                         print(f"Bỏ qua file {imgpath} vì không tìm thấy khuôn mặt.")
                         continue
@@ -42,12 +43,12 @@ def getImages(dataset_path):
     return faceSamples, ids
 
 print("Đang huấn luyện...")
-faces, ids = getImages("../dataset")
+faces, ids = getImages("../../dataset")
 
 # Kiểm tra dữ liệu không rỗng
 if faces and ids:
     recognizer.train(faces, np.array(ids))
-    recognizer.write('../trainer/trainer.yml')
+    recognizer.write('../../trainer/trainer.yml')
     print("Huấn luyện hoàn tất và lưu vào file 'trainer/trainer.yml'.")
 else:
     print("Lỗi: Dữ liệu khuôn mặt hoặc ID bị rỗng.")

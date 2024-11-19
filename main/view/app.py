@@ -2,6 +2,8 @@ import sys
 import threading
 import subprocess
 import mysql.connector
+import os
+import cv2
 import openpyxl
 from addUser import AddUserWindow
 from editUser import EditUserWindow
@@ -67,6 +69,9 @@ class HomeWindow(QWidget):
         self.export_button = QPushButton("Xuất Excel")
         add_layout.addWidget(self.export_button)
 
+        self.train_button = QPushButton("Train")
+        add_layout.addWidget(self.train_button)
+
         # Spacer để đẩy nút "Thêm Người Dùng" sang phải
         spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
         add_layout.addItem(spacer)
@@ -119,6 +124,7 @@ class HomeWindow(QWidget):
         # Kết nối sự kiện khi nhấn nút
         self.add_button.clicked.connect(self.open_add_user_window)
         self.export_button.clicked.connect(self.export_to_excel)
+        self.train_button.clicked.connect(self.train_face)
         self.refresh_button.clicked.connect(self.load_users)  # Kết nối nút với hàm load_users
 
         # Tạo widget chính và thiết lập layout
@@ -259,12 +265,40 @@ class HomeWindow(QWidget):
             except Exception as e:
                 print(f"Lỗi khi xuất dữ liệu ra Excel: {e}")
 
+
+    def train_face(self):
+        """
+        Chạy file train.py để huấn luyện dữ liệu khuôn mặt.
+        """
+        try:
+            # Đường dẫn file train.py
+            train_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../train.py')
+
+            # Đường dẫn Python hiện tại (môi trường IDE)
+            python_executable = sys.executable
+
+            # Gọi subprocess với Python đúng môi trường
+            process = subprocess.Popen([python_executable, train_script], stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+
+            if process.returncode == 0:
+                QMessageBox.information(self, "Huấn luyện", "Đào tạo hoàn tất!\n" + stdout.decode())
+            else:
+                QMessageBox.critical(self, "Lỗi", "Có lỗi xảy ra trong quá trình đào tạo.\n" + stderr.decode())
+
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Lỗi khi chạy train.py: {str(e)}")
+
+
 # --CALENDAR---------------------------------------------------------------CALENDAR-------->
 class CalendarApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Calendar App - Attendance")
         self.resize(800, 600)
+
+        self.load_stylesheet("css/style.css")
 
         # Layout chính
         layout = QVBoxLayout()
@@ -278,12 +312,26 @@ class CalendarApp(QMainWindow):
         self.user_table = QTableWidget()
         self.user_table.setColumnCount(6)
         self.user_table.setHorizontalHeaderLabels(["User ID", "Name","CCCD","Phone","Email","Time Start"])
+        self.user_table.setSelectionBehavior(QTableWidget.SelectRows)
         layout.addWidget(self.user_table)
+
+        header = self.user_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
 
         # Thiết lập widget chính
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
+
+    def load_stylesheet(self, filename):
+        """Tải file CSS và áp dụng vào ứng dụng"""
+        file = QFile(filename)
+        if file.open(QFile.ReadOnly | QFile.Text):
+            stream = QTextStream(file)
+            stylesheet = stream.readAll()
+            self.setStyleSheet(stylesheet)
+            file.close()
+
 
     def display_users_on_date(self, date: QDate):
         selected_date = date.toString("yyyy-MM-dd")
@@ -310,7 +358,7 @@ class CalendarApp(QMainWindow):
                 self.user_table.setItem(row, 2, QTableWidgetItem(cccd))
                 self.user_table.setItem(row, 3, QTableWidgetItem(phone))
                 self.user_table.setItem(row, 4, QTableWidgetItem(email))
-                self.user_table.setItem(row, 5, QTableWidgetItem(str(start_time)))
+                self.user_table.setItem(row, 5, QTableWidgetItem(start_time.strftime("%H:%M:%S")))
 
         except mysql.connector.Error as e:
             print(f"Lỗi kết nối DB: {e}")
@@ -415,6 +463,10 @@ class LoginWindow(QMainWindow):
         x = (screen.width() - window_size.width()) // 2
         y = (screen.height() - window_size.height()) // 2
         self.move(x, y)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            self.check_login()  # Gọi hàm check_login khi nhấn Enter
 
     def check_login(self):
         username = self.input_username.text()

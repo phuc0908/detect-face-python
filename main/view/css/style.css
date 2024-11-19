@@ -27,3 +27,11 @@ QPushButton:hover {
 QPushButton:pressed {
     background-color: #1abc9c;
 }
+
+QTableWidgetItem{
+    background-color: #1abc9c;
+    text-align: center;
+}
+/*QTableWidget{*/
+/*    background-color: #1abc9c;*/
+/*}*/
